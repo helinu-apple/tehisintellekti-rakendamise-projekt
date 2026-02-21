@@ -18,8 +18,8 @@ with st.sidebar:
 @st.cache_resource
 def get_models():
     embedder = SentenceTransformer("BAAI/bge-m3")
-    df = pd.read_csv("../data/puhtad_andmed.csv")
-    embeddings_df = pd.read_pickle("../data/puhtad_andmed_embeddings.pkl")
+    df = pd.read_csv("puhtad_andmed.csv")
+    embeddings_df = pd.read_pickle("puhtad_andmed_embeddings.pkl")
     return embedder, df, embeddings_df
 embedder, df, embeddings_df = get_models()
 

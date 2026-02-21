@@ -14,12 +14,18 @@ with st.sidebar:
     api_key = st.text_input("OpenRouter API Key", type="password")
     st.info("Selles versioonis on koodis filter: ainult ingliskeelsed kursused.")
 
+    # ✅ lisa semester valik (kohanda väärtused oma andmete järgi)
+    semester = st.selectbox("Semester", ["kevad", "sügis"], index=0)
+
+    # ✅ (soovi korral) EAP vahemik UI-st
+    min_eap, max_eap = st.slider("EAP vahemik", 1, 30, (1, 19))
+
 # embed mudel, täisandmestik ja vektorandmebaas läheb cache'i
 @st.cache_resource
 def get_models():
     embedder = SentenceTransformer("BAAI/bge-m3")
-    df = pd.read_csv("../data/puhtad_andmed.csv")
-    embeddings_df = pd.read_pickle("../data/puhtad_andmed_embeddings.pkl")
+    df = pd.read_csv("puhtad_andmed.csv")
+    embeddings_df = pd.read_pickle("puhtad_andmed_embeddings.pkl")
     return embedder, df, embeddings_df
 embedder, df, embeddings_df = get_models()
 
@@ -47,9 +53,14 @@ if prompt := st.chat_input("Kirjelda, mida soovid õppida..."):
             with st.spinner("Otsin sobivaid kursusi..."):
                 # 1. ühenda kaks andmetabelit ja filtreeri esmalt EAP-de ja semestri alusel
                 merged_df = pd.merge(df, embeddings_df, on='unique_ID')
-                mask = 
-                filtered_df = 
+    
+                mask = (
+                    merged_df["eap"].between(min_eap, max_eap) &
+                    (merged_df["semester"].astype(str).str.lower() == str(semester).lower())
+                )
 
+                filtered_df = merged_df.loc[mask].copy()
+                
                 #kontroll (sanity check)
                 if filtered_df.empty:
                     st.warning("Ühtegi kursust ei vasta filtritele.")
@@ -68,13 +79,17 @@ if prompt := st.chat_input("Kirjelda, mida soovid õppida..."):
 
                 # 3. LLM vastus
                 client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
-                system_prompt = {
-                    "role": "system", 
-                    "content": f"Oled nõustaja. Kasuta järgmisi kursusi (filtreeritud: inglise keel):\n\n{context_text}"
-                }
-                
-                messages_to_send = [system_prompt] + st.session_state.messages
-                
+                instruction_text = (
+                "Sa oled kursusenõustaja.\n"
+                "Kasuta ainult järgnevaid RAGi leitud kursusi vastamiseks.\n"
+                "Kui info ei piisa, ütle seda.\n\n"
+                f"KONTEKST:\n{context_text}\n\n"
+                f"KASUTAJA KÜSIMUS:\n{prompt}"
+            )
+
+                messages_to_send = [
+                    {"role": "user", "content": instruction_text}
+                ]
                 try:
                     stream = client.chat.completions.create(
                         model="google/gemma-3-27b-it:free",

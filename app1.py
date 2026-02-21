@@ -27,6 +27,3 @@ if prompt := st.chat_input("Kirjelda, mida soovid õppida..."):
     st.session_state.messages.append({"role": "assistant", "content": response})
     with st.chat_message("assistant"):
         st.markdown(response)
-
-
-google/gemma-3-27b-it:free
