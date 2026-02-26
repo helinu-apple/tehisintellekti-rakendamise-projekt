@@ -1,9 +1,12 @@
+from tkinter import Button
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+
 
 # pealkiri
 st.title("🎓 AI Kursuse Nõustaja - Samm 5")
@@ -13,6 +16,16 @@ st.caption("RAG süsteem koos eel-filtreerimisega.")
 with st.sidebar:
     api_key = st.text_input("OpenRouter API Key", type="password")
     st.info("Selles versioonis on koodis filter: ainult ingliskeelsed kursused.")
+
+
+    # lisa semester valik
+    semester = st.selectbox("Semester", ["kevad", "sügis"], index=0)
+
+    # EAP vahemik UI-st
+    min_eap, max_eap = st.slider("EAP vahemik", 1, 20, (1, 10))
+
+    hindamisviis = st.selectbox("Hindamisviis", ["Eristav", "Eristamata"], index=0)
+  
 
 # embed mudel, täisandmestik ja vektorandmebaas läheb cache'i
 @st.cache_resource
@@ -48,7 +61,10 @@ if prompt := st.chat_input("Kirjelda, mida soovid õppida..."):
                 # 1. Filtreeri andmetabel (näiteks fikseeri EAP arv ja semester)
                 # Kasutame .copy(), et vältida hilisemaid hoiatusi andmete muutmise kohta
                 merged_df = pd.merge(df, embeddings_df, on='unique_ID')
-                mask = ((merged_df['semester'] == 'kevad' )& (merged_df["eap"]==6))
+                
+                mask = ((merged_df['semester'] == semester )& 
+                        (merged_df["eap"].between(min_eap, max_eap)) & 
+                        (merged_df["hindamisviis"] == hindamisviis))
                 filtered_df = merged_df[mask].copy()
                 
                 #kontroll (sanity check)
@@ -71,7 +87,7 @@ if prompt := st.chat_input("Kirjelda, mida soovid õppida..."):
                 client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
                 system_prompt = {
                     "role": "system", 
-                    "content": f"Oled nõustaja. Kasuta järgmisi kursusi (filtreeritud: inglise keel):\n\n{context_text}"
+                    "content": f"Oled nõustaja. Kasuta järgmisi kursusi:\n\n{context_text}"
                 }
                 
                 messages_to_send = [system_prompt] + st.session_state.messages
